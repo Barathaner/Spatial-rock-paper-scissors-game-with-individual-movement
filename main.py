@@ -9,7 +9,7 @@ N = 100  # Size of the grid (N x N)
 sigma = 1  # Selection rate
 mu = 1  # Reproduction rate
 epsilon = 1  # Movement rate
-num_generations = 1000  # Number of generations to simulate
+num_generations = 100  # Number of generations to simulate
 reproduction_count_goal = (
     N  # Number of reproduction events required to move to the next generation
 )
