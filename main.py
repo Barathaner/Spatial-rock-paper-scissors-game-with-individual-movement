@@ -6,11 +6,12 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.widgets import Button
 
 # Define constants
-N = 100  # Size of the grid (N x N)
+N = 40  # Size of the grid (N x N)
 sigma = 1  # Selection rate
-mu = 2  # Reproduction rate
-epsilon = 8  # Movement rate
-num_generations = 2000  # Number of generations to simulate
+mu = 1  # Reproduction rate
+epsilon = 15  # Movement rate
+num_generations = 10000  # Number of generations to simulate
+
 # Calculate total rate
 total_rate = sigma + mu + epsilon
 # Define a mapping from strings to numbers
@@ -18,6 +19,7 @@ str_to_num = {"": 0, "paper": 1, "scissors": 2, "rock": 3}
 
 # Neue Variable für den aktuellen Frame hinzufügen
 current_frame = 0
+color_distribution = {"Empty": 0, "Paper": 0, "Scissors": 0, "Rock": 0}
 
 
 # Define RPS rules
@@ -69,8 +71,8 @@ ax.set_title("Rock-Paper-Scissors Grid - Generation 0")
 
 # Function to update the plot for each generation
 def update(frame):
-    global grid
-    global reproduction_count
+    # Reset reproduction_count for the next generation
+    reproduction_count = 0
 
     while reproduction_count < N:
         # Choose a random event based on rates
@@ -114,8 +116,18 @@ def update(frame):
             # Increment the reproduction count for the current generation
             reproduction_count += 1
 
-    # Reset reproduction_count for the next generation
-    reproduction_count = 0
+        elif event == "movement":
+            # Choose a random neighbor (including empty cells)
+            dx, dy = random.choice(neighbors)
+            neighbor_x, neighbor_y = (x + dx) % N, (
+                y + dy
+            ) % N  # Apply periodic boundaries
+
+            # Swap positions of the two individuals
+            grid[x, y], grid[neighbor_x, neighbor_y] = (
+                grid[neighbor_x, neighbor_y],
+                grid[x, y],
+            )
 
     # Update the plot with the current state of the grid
     img.set_array(np.vectorize(str_to_num.get)(grid))
@@ -145,22 +157,14 @@ def reset_animation(event):
     current_frame = 0  # Setze den aktuellen Frame zurück
     img.set_array(np.vectorize(str_to_num.get)(grid))
     ax.set_title("Rock-Paper-Scissors Grid - Generation 0")
+    ani.frame_seq = ani.new_frame_seq()  # Setze den Frame-Generator zurück
     ani.event_source.stop()
-
-
-def fast_forward(event):
-    global current_frame
-    while current_frame != num_generations - 1:
-        update(current_frame)
-        current_frame += 1
-        plt.pause(0.01)
 
 
 # Buttons hinzufügen
 ax_start = plt.axes([0.1, 0.01, 0.1, 0.05])
 ax_stop = plt.axes([0.25, 0.01, 0.1, 0.05])
 ax_reset = plt.axes([0.4, 0.01, 0.1, 0.05])
-ax_ff = plt.axes([0.55, 0.01, 0.1, 0.05])
 
 btn_start = Button(ax_start, "Start")
 btn_start.on_clicked(start_animation)
@@ -171,7 +175,5 @@ btn_stop.on_clicked(stop_animation)
 btn_reset = Button(ax_reset, "Reset")
 btn_reset.on_clicked(reset_animation)
 
-btn_ff = Button(ax_ff, "Fast Forward")
-btn_ff.on_clicked(fast_forward)
 
 plt.show()
