@@ -3,20 +3,21 @@ import random
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.animation import FuncAnimation
+from matplotlib.widgets import Button
 
 # Define constants
 N = 100  # Size of the grid (N x N)
 sigma = 1  # Selection rate
-mu = 1  # Reproduction rate
-epsilon = 1  # Movement rate
-num_generations = 100  # Number of generations to simulate
-reproduction_count_goal = (
-    N  # Number of reproduction events required to move to the next generation
-)
+mu = 2  # Reproduction rate
+epsilon = 8  # Movement rate
+num_generations = 2000  # Number of generations to simulate
 # Calculate total rate
 total_rate = sigma + mu + epsilon
 # Define a mapping from strings to numbers
 str_to_num = {"": 0, "paper": 1, "scissors": 2, "rock": 3}
+
+# Neue Variable für den aktuellen Frame hinzufügen
+current_frame = 0
 
 
 # Define RPS rules
@@ -53,6 +54,16 @@ img = ax.imshow(np.vectorize(str_to_num.get)(grid), cmap=cmap, norm=norm)
 colorbar = plt.colorbar(img, cax=cax, ticks=[0.5, 1.5, 2.5, 3.5])
 colorbar.ax.set_yticklabels(["Empty", "Paper", "Scissors", "Rock"])
 
+# Anzeige der Gewichtungen links vom Grid
+ax.text(
+    -0.1,
+    0.5,
+    f"Sigma={sigma}\nMu={mu}\nEpsilon={epsilon}",
+    transform=ax.transAxes,
+    va="center",
+    ha="right",
+)
+
 ax.set_title("Rock-Paper-Scissors Grid - Generation 0")
 
 
@@ -61,7 +72,7 @@ def update(frame):
     global grid
     global reproduction_count
 
-    while reproduction_count < reproduction_count_goal:
+    while reproduction_count < N:
         # Choose a random event based on rates
         event = random.choices(
             ["selection", "reproduction", "movement"], weights=[sigma, mu, epsilon]
@@ -85,8 +96,8 @@ def update(frame):
             # The loser dies, and its cell becomes empty
             if winner != individual:
                 grid[x, y] = ""
-            else:
-                grid[neighbor_x, neighbor_y] = ""
+            # else:
+            # grid[neighbor_x, neighbor_y] = ""
 
         elif event == "reproduction":
             # Check for empty neighboring cells
@@ -100,23 +111,10 @@ def update(frame):
                 empty_x, empty_y = random.choice(empty_neighbors)
                 grid[empty_x % N, empty_y % N] = individual
 
-            # Inkrementiere die Anzahl der Reproduktionsevents in der aktuellen Generation
+            # Increment the reproduction count for the current generation
             reproduction_count += 1
 
-        elif event == "movement":
-            # Choose a random neighbor (including empty cells)
-            dx, dy = random.choice(neighbors)
-            neighbor_x, neighbor_y = (x + dx) % N, (
-                y + dy
-            ) % N  # Apply periodic boundaries
-
-            # Swap positions of the two individuals
-            grid[x, y], grid[neighbor_x, neighbor_y] = (
-                grid[neighbor_x, neighbor_y],
-                grid[x, y],
-            )
-
-    # Reset reproduction_count für die nächste Generation
+    # Reset reproduction_count for the next generation
     reproduction_count = 0
 
     # Update the plot with the current state of the grid
@@ -125,6 +123,55 @@ def update(frame):
 
 
 # Erstelle die Animation
-ani = FuncAnimation(fig, update, frames=num_generations, interval=200, repeat=False)
+ani = FuncAnimation(fig, update, frames=num_generations, interval=50, repeat=False)
+
+
+# Funktionen für die Buttons
+def start_animation(event):
+    ani.event_source.start()
+
+
+def stop_animation(event):
+    ani.event_source.stop()
+
+
+# Funktion zum Zurücksetzen der Animation aktualisieren
+def reset_animation(event):
+    global grid
+    global reproduction_count
+    global current_frame
+    grid = np.random.choice(["rock", "paper", "scissors"], size=(N, N))
+    reproduction_count = 0
+    current_frame = 0  # Setze den aktuellen Frame zurück
+    img.set_array(np.vectorize(str_to_num.get)(grid))
+    ax.set_title("Rock-Paper-Scissors Grid - Generation 0")
+    ani.event_source.stop()
+
+
+def fast_forward(event):
+    global current_frame
+    while current_frame != num_generations - 1:
+        update(current_frame)
+        current_frame += 1
+        plt.pause(0.01)
+
+
+# Buttons hinzufügen
+ax_start = plt.axes([0.1, 0.01, 0.1, 0.05])
+ax_stop = plt.axes([0.25, 0.01, 0.1, 0.05])
+ax_reset = plt.axes([0.4, 0.01, 0.1, 0.05])
+ax_ff = plt.axes([0.55, 0.01, 0.1, 0.05])
+
+btn_start = Button(ax_start, "Start")
+btn_start.on_clicked(start_animation)
+
+btn_stop = Button(ax_stop, "Stop")
+btn_stop.on_clicked(stop_animation)
+
+btn_reset = Button(ax_reset, "Reset")
+btn_reset.on_clicked(reset_animation)
+
+btn_ff = Button(ax_ff, "Fast Forward")
+btn_ff.on_clicked(fast_forward)
 
 plt.show()
