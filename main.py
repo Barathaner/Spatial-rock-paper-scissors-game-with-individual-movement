@@ -6,7 +6,7 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.widgets import Button
 
 # Define constants
-N = 40  # Size of the grid (N x N)
+N = 100  # Size of the grid (N x N)
 sigma = 1  # Selection rate
 mu = 1  # Reproduction rate
 epsilon = 15  # Movement rate
@@ -52,6 +52,10 @@ neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 fig, (ax, cax) = plt.subplots(
     1, 2, figsize=(10, 5), gridspec_kw={"width_ratios": [1, 0.05]}
 )
+
+# Shift the Colorbar to the left
+fig.subplots_adjust(right=0.8)
+
 img = ax.imshow(np.vectorize(str_to_num.get)(grid), cmap=cmap, norm=norm)
 colorbar = plt.colorbar(img, cax=cax, ticks=[0.5, 1.5, 2.5, 3.5])
 colorbar.ax.set_yticklabels(["Empty", "Paper", "Scissors", "Rock"])
@@ -71,6 +75,45 @@ ax.set_title("Rock-Paper-Scissors Grid - Generation 0")
 
 # Function to update the plot for each generation
 def update(frame):
+    # Calculate the percentage of each color at the beginning of the generation
+    color_percentage = {
+        color.capitalize(): np.count_nonzero(grid == color) / grid.size * 100
+        for color in str_to_num.keys()
+    }
+
+    # Update Colorbar ticks with percentage values
+    colorbar.ax.set_yticklabels(
+        [
+            f"Empty - {color_percentage['']:.2f}%",
+            f"Paper - {color_percentage['Paper']:.2f}%",
+            f"Scissors - {color_percentage['Scissors']:.2f}%",
+            f"Rock - {color_percentage['Rock']:.2f}%",
+        ]
+    )
+
+    # Check if all cells have the same color
+    unique_colors = np.unique(grid)
+    if len(unique_colors) == 2 and "" in unique_colors:
+        # If only one non-empty color exists, stop the animation
+        ani.event_source.stop()
+
+        # Find the remaining color
+        remaining_color = [color for color in unique_colors if color != ""][0]
+
+        # Display a message on the plot
+        ax.text(
+            0.5,
+            1.1,
+            f"Only {remaining_color.capitalize()} remain",
+            transform=ax.transAxes,
+            va="center",
+            ha="center",
+            fontsize=12,
+            color="red",
+        )
+
+        return
+
     # Reset reproduction_count for the next generation
     reproduction_count = 0
 
@@ -162,9 +205,9 @@ def reset_animation(event):
 
 
 # Buttons hinzufügen
-ax_start = plt.axes([0.1, 0.01, 0.1, 0.05])
-ax_stop = plt.axes([0.25, 0.01, 0.1, 0.05])
-ax_reset = plt.axes([0.4, 0.01, 0.1, 0.05])
+ax_start = plt.axes([0.15, 0.01, 0.1, 0.05])
+ax_stop = plt.axes([0.35, 0.01, 0.1, 0.05])
+ax_reset = plt.axes([0.56, 0.01, 0.1, 0.05])
 
 btn_start = Button(ax_start, "Start")
 btn_start.on_clicked(start_animation)
@@ -174,6 +217,5 @@ btn_stop.on_clicked(stop_animation)
 
 btn_reset = Button(ax_reset, "Reset")
 btn_reset.on_clicked(reset_animation)
-
 
 plt.show()
