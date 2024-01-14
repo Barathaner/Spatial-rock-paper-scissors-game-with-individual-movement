@@ -9,20 +9,20 @@ from matplotlib.widgets import Button
 N = 100  # Size of the grid (N x N)
 sigma = 1  # Selection rate
 mu = 1  # Reproduction rate
-epsilon = 15  # Movement rate
-num_generations = 10000  # Number of generations to simulate
+epsilon = 10  # Movement rate
+num_generations = 10000  # Number of maximum generations to simulate
 
 # Calculate total rate
 total_rate = sigma + mu + epsilon
 # Define a mapping from strings to numbers
 str_to_num = {"": 0, "paper": 1, "scissors": 2, "rock": 3}
 
-# Neue Variable für den aktuellen Frame hinzufügen
+# Add a new variable for the current frame
 current_frame = 0
 color_distribution = {"Empty": 0, "Paper": 0, "Scissors": 0, "Rock": 0}
 
 
-# Define RPS rules
+# Define Rock-Paper-Scissors rules
 def rps_winner(a, b):
     if a == "rock" and b == "scissors":
         return "rock"
@@ -37,7 +37,7 @@ def rps_winner(a, b):
 # Initialize the grid with random individuals
 grid = np.random.choice(["rock", "paper", "scissors"], size=(N, N))
 
-# Initialisiere reproduction_count auf 0
+# Initialize reproduction_count to 0
 reproduction_count = 0
 
 # Create a color map for the states
@@ -60,7 +60,7 @@ img = ax.imshow(np.vectorize(str_to_num.get)(grid), cmap=cmap, norm=norm)
 colorbar = plt.colorbar(img, cax=cax, ticks=[0.5, 1.5, 2.5, 3.5])
 colorbar.ax.set_yticklabels(["Empty", "Paper", "Scissors", "Rock"])
 
-# Anzeige der Gewichtungen links vom Grid
+# Display the weights to the left of the grid
 ax.text(
     -0.1,
     0.5,
@@ -134,6 +134,8 @@ def update(frame):
                 y + dy
             ) % N  # Apply periodic boundaries
             neighbor = grid[neighbor_x, neighbor_y]
+            if neighbor == "":
+                continue
 
             # Determine the winner of RPS
             winner = rps_winner(individual, neighbor)
@@ -141,8 +143,6 @@ def update(frame):
             # The loser dies, and its cell becomes empty
             if winner != individual:
                 grid[x, y] = ""
-            # else:
-            # grid[neighbor_x, neighbor_y] = ""
 
         elif event == "reproduction":
             # Check for empty neighboring cells
@@ -177,11 +177,11 @@ def update(frame):
     ax.set_title("Rock-Paper-Scissors Grid - Generation {}".format(frame))
 
 
-# Erstelle die Animation
+# Create the animation
 ani = FuncAnimation(fig, update, frames=num_generations, interval=50, repeat=False)
 
 
-# Funktionen für die Buttons
+# Functions for the buttons
 def start_animation(event):
     ani.event_source.start()
 
@@ -190,21 +190,21 @@ def stop_animation(event):
     ani.event_source.stop()
 
 
-# Funktion zum Zurücksetzen der Animation aktualisieren
+# Update reset animation function
 def reset_animation(event):
     global grid
     global reproduction_count
     global current_frame
     grid = np.random.choice(["rock", "paper", "scissors"], size=(N, N))
     reproduction_count = 0
-    current_frame = 0  # Setze den aktuellen Frame zurück
+    current_frame = 0  # Reset the current frame
     img.set_array(np.vectorize(str_to_num.get)(grid))
     ax.set_title("Rock-Paper-Scissors Grid - Generation 0")
-    ani.frame_seq = ani.new_frame_seq()  # Setze den Frame-Generator zurück
+    ani.frame_seq = ani.new_frame_seq()  # Reset the frame generator
     ani.event_source.stop()
 
 
-# Buttons hinzufügen
+# Add buttons
 ax_start = plt.axes([0.15, 0.01, 0.1, 0.05])
 ax_stop = plt.axes([0.35, 0.01, 0.1, 0.05])
 ax_reset = plt.axes([0.56, 0.01, 0.1, 0.05])
