@@ -1,208 +1,111 @@
 import numpy as np
-import random
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.animation import FuncAnimation
 from matplotlib.widgets import Button
 
 # Define constants
-N = 100  # Size of the grid (N x N)
-sigma = 1  # Selection rate
-mu = 1  # Reproduction rate
-epsilon = 10  # Movement rate
-num_generations = 10000  # Number of maximum generations to simulate
+N = 300  # Size of the grid (N x N)
+sigma = 1.0  # Selection rate
+mu = 1.0  # Reproduction rate
+epsilon =0.00001  # Movement rate (increased for more mobility)
+num_generations = 5000  # Increased number of generations
 
 # Calculate total rate
 total_rate = sigma + mu + epsilon
-# Define a mapping from strings to numbers
-str_to_num = {"": 0, "paper": 1, "scissors": 2, "rock": 3}
 
-# Add a new variable for the current frame
-current_frame = 0
-color_distribution = {"Empty": 0, "Paper": 0, "Scissors": 0, "Rock": 0}
-
-
-# Define Rock-Paper-Scissors rules
-def rps_winner(a, b):
-    if a == "rock" and b == "scissors":
-        return "rock"
-    elif a == "scissors" and b == "paper":
-        return "scissors"
-    elif a == "paper" and b == "rock":
-        return "paper"
-    else:
-        return b
-
-
-# Initialize the grid with random individuals
-grid = np.random.choice(["rock", "paper", "scissors"], size=(N, N))
-
-# Initialize reproduction_count to 0
-reproduction_count = 0
+# Initialize the grid with larger clusters
+grid = np.zeros((N, N), dtype=int)
+cluster_size = 20
+for i in range(0, N, cluster_size):
+    for j in range(0, N, cluster_size):
+        grid[i:i+cluster_size, j:j+cluster_size] = np.random.randint(1, 4)
 
 # Create a color map for the states
-cmap = mcolors.ListedColormap(["#FFFFFF", "#00FF00", "#0000FF", "#FF0000"])
+cmap = mcolors.ListedColormap(["#FFFFFF", "#FFFF00", "#0000FF", "#FF0000"])  # Changed #00FF00 to #FFFF00
 bounds = [0, 1, 2, 3, 4]
 norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
-# Define neighbor coordinates (top, bottom, left, right)
-neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-
 # Create the plot and colorbar
-fig, (ax, cax) = plt.subplots(
-    1, 2, figsize=(10, 5), gridspec_kw={"width_ratios": [1, 0.05]}
-)
-
-# Shift the Colorbar to the left
+fig, (ax, cax) = plt.subplots(1, 2, figsize=(12, 6), gridspec_kw={"width_ratios": [1, 0.05]})
 fig.subplots_adjust(right=0.8)
+fig.canvas.manager.set_window_title('Spatial Rock Paper Scissors')
 
-img = ax.imshow(np.vectorize(str_to_num.get)(grid), cmap=cmap, norm=norm)
+img = ax.imshow(grid, cmap=cmap, norm=norm, interpolation='nearest')
 colorbar = plt.colorbar(img, cax=cax, ticks=[0.5, 1.5, 2.5, 3.5])
 colorbar.ax.set_yticklabels(["Empty", "Paper", "Scissors", "Rock"])
 
-# Display the weights to the left of the grid
-ax.text(
-    -0.1,
-    0.5,
-    f"Sigma={sigma}\nMu={mu}\nEpsilon={epsilon}",
-    transform=ax.transAxes,
-    va="center",
-    ha="right",
-)
-
+ax.text(-0.1, 0.5, f"Selection={sigma}\nReproduction={mu}\nMovement={epsilon}", transform=ax.transAxes, va="center", ha="right")
 ax.set_title("Rock-Paper-Scissors Grid - Generation 0")
 
+# Precompute neighbor indices
+neighbors = np.array([[-1, 0], [1, 0], [0, -1], [0, 1]])
 
-# Function to update the plot for each generation
 def update(frame):
-    # Calculate the percentage of each color at the beginning of the generation
-    color_percentage = {
-        color.capitalize(): np.count_nonzero(grid == color) / grid.size * 100
-        for color in str_to_num.keys()
-    }
+    global grid
+    
+    new_grid = grid.copy()
+    
+    # Selection
+    mask = np.random.random(size=(N, N)) < sigma / total_rate
+    neighbor_coords = (np.indices((N, N)).T[:,:,None] + neighbors[np.random.randint(0, 4, size=(N, N))][:,:,None]).reshape(-1, 2) % N
+    neighbor_values = grid[neighbor_coords[:,0], neighbor_coords[:,1]].reshape(N, N)
+    new_grid[mask & ((grid % 3 + 1) == neighbor_values)] = 0
+    
+    # Reproduction
+    mask = (np.random.random(size=(N, N)) < mu / total_rate) & (new_grid == 0)
+    if mask.any():
+        reproducing_coords = np.argwhere(mask)
+        neighbor_coords = (reproducing_coords[:, None] + neighbors[np.random.randint(0, 4, size=len(reproducing_coords))][:, None]).reshape(-1, 2) % N
+        neighbor_values = grid[neighbor_coords[:,0], neighbor_coords[:,1]]
+        valid_reproductions = neighbor_values != 0
+        new_grid[reproducing_coords[valid_reproductions,0], reproducing_coords[valid_reproductions,1]] = neighbor_values[valid_reproductions]
+    
+    # Movement
+    mask = np.random.random(size=(N, N)) < epsilon / total_rate
+    if mask.any():
+        moving_coords = np.argwhere(mask)
+        swap_coords = (moving_coords + neighbors[np.random.randint(0, 4, size=len(moving_coords))]) % N
+        new_grid[moving_coords[:,0], moving_coords[:,1]], new_grid[swap_coords[:,0], swap_coords[:,1]] = \
+            new_grid[swap_coords[:,0], swap_coords[:,1]], new_grid[moving_coords[:,0], moving_coords[:,1]]
 
-    # Update Colorbar ticks with percentage values
-    colorbar.ax.set_yticklabels(
-        [
-            f"Empty - {color_percentage['']:.2f}%",
-            f"Paper - {color_percentage['Paper']:.2f}%",
-            f"Scissors - {color_percentage['Scissors']:.2f}%",
-            f"Rock - {color_percentage['Rock']:.2f}%",
-        ]
-    )
-
-    # Check if all cells have the same color
-    unique_colors = np.unique(grid)
-    if len(unique_colors) == 2 and "" in unique_colors:
-        # If only one non-empty color exists, stop the animation
-        ani.event_source.stop()
-
-        # Find the remaining color
-        remaining_color = [color for color in unique_colors if color != ""][0]
-
-        # Display a message on the plot
-        ax.text(
-            0.5,
-            1.1,
-            f"Only {remaining_color.capitalize()} remain",
-            transform=ax.transAxes,
-            va="center",
-            ha="center",
-            fontsize=12,
-            color="red",
-        )
-
-        return
-
-    # Reset reproduction_count for the next generation
-    reproduction_count = 0
-
-    while reproduction_count < N:
-        # Choose a random event based on rates
-        event = random.choices(
-            ["selection", "reproduction", "movement"], weights=[sigma, mu, epsilon]
-        )[0]
-
-        # Choose a random individual
-        x, y = random.randint(0, N - 1), random.randint(0, N - 1)
-        individual = grid[x, y]
-
-        if event == "selection":
-            # Choose a random neighbor
-            dx, dy = random.choice(neighbors)
-            neighbor_x, neighbor_y = (x + dx) % N, (
-                y + dy
-            ) % N  # Apply periodic boundaries
-            neighbor = grid[neighbor_x, neighbor_y]
-            if neighbor == "":
-                continue
-
-            # Determine the winner of RPS
-            winner = rps_winner(individual, neighbor)
-
-            # The loser dies, and its cell becomes empty
-            if winner != individual:
-                grid[x, y] = ""
-
-        elif event == "reproduction":
-            # Check for empty neighboring cells
-            empty_neighbors = [
-                (x + dx, y + dy)
-                for dx, dy in neighbors
-                if grid[(x + dx) % N, (y + dy) % N] == ""
-            ]
-            if empty_neighbors:
-                # Choose a random empty neighbor
-                empty_x, empty_y = random.choice(empty_neighbors)
-                grid[empty_x % N, empty_y % N] = individual
-
-            # Increment the reproduction count for the current generation
-            reproduction_count += 1
-
-        elif event == "movement":
-            # Choose a random neighbor (including empty cells)
-            dx, dy = random.choice(neighbors)
-            neighbor_x, neighbor_y = (x + dx) % N, (
-                y + dy
-            ) % N  # Apply periodic boundaries
-
-            # Swap positions of the two individuals
-            grid[x, y], grid[neighbor_x, neighbor_y] = (
-                grid[neighbor_x, neighbor_y],
-                grid[x, y],
-            )
+    grid = new_grid
 
     # Update the plot with the current state of the grid
-    img.set_array(np.vectorize(str_to_num.get)(grid))
-    ax.set_title("Rock-Paper-Scissors Grid - Generation {}".format(frame))
+    img.set_array(grid)
+    ax.set_title(f"Rock-Paper-Scissors Grid - Generation {frame}")
 
+    # Calculate and update color percentages
+    unique, counts = np.unique(grid, return_counts=True)
+    percentages = dict(zip(unique, counts / grid.size * 100))
+    colorbar.ax.set_yticklabels([
+        f"Empty - {percentages.get(0, 0):.2f}%",
+        f"Paper - {percentages.get(1, 0):.2f}%",
+        f"Scissors - {percentages.get(2, 0):.2f}%",
+        f"Rock - {percentages.get(3, 0):.2f}%",
+    ])
 
 # Create the animation
 ani = FuncAnimation(fig, update, frames=num_generations, interval=50, repeat=False)
-
 
 # Functions for the buttons
 def start_animation(event):
     ani.event_source.start()
 
-
 def stop_animation(event):
     ani.event_source.stop()
 
-
-# Update reset animation function
 def reset_animation(event):
     global grid
-    global reproduction_count
-    global current_frame
-    grid = np.random.choice(["rock", "paper", "scissors"], size=(N, N))
-    reproduction_count = 0
-    current_frame = 0  # Reset the current frame
-    img.set_array(np.vectorize(str_to_num.get)(grid))
+    grid = np.zeros((N, N), dtype=int)
+    cluster_size = 20
+    for i in range(0, N, cluster_size):
+        for j in range(0, N, cluster_size):
+            grid[i:i+cluster_size, j:j+cluster_size] = np.random.randint(1, 4)
+    img.set_array(grid)
     ax.set_title("Rock-Paper-Scissors Grid - Generation 0")
     ani.frame_seq = ani.new_frame_seq()  # Reset the frame generator
     ani.event_source.stop()
-
 
 # Add buttons
 ax_start = plt.axes([0.15, 0.01, 0.1, 0.05])
